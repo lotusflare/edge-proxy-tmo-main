@@ -1,0 +1,165 @@
+include:
+  - project: "tmobile/templates"
+    file: "/gitlab-ci/.tmo.function.edge.compliance.gitlab-ci.yml"
+  - project: "tmobile/templates"
+    file: "/gitlab-ci/.tmo.function.edge.meg-deploy.gitlab-ci.yml"
+  - project: 'tmobile/templates'
+    file: '/gitlab-ci/.tmo.function.newman.gitlab-ci.yml'
+  - project: 'tmobile/templates'
+    file: '/gitlab-ci/.tmo.function.qtest.gitlab-ci.yml'
+  - project: "tmobile/templates"
+    file: "/gitlab-ci/.tmo.function.edge.post-deploy.gitlab-ci.yml"
+  - project: 'tmobile/templates'
+    file:
+      - '/gitlab-ci/.tmo.global.common.gitlab-ci.yml'
+
+stages:
+  - tmo
+  - test
+  - config
+  - history
+  - deploy
+  - dast
+
+variables:
+  ############ Proxies asset-id #############
+  TMOSDO_SELF_SERVICE_AUTH_ASSET_ID_OVERRIDE: DU0250231
+  TMOSDO_SELF_SERVICE_DAM_ASSET_ID_OVERRIDE: DU0250232
+  TMOSDO_SELF_SERVICE_FLEX_ASSET_ID_OVERRIDE: DU0250233
+  TMOSDO_SELF_SERVICE_METRO_ASSET_ID_OVERRIDE: DU0250234
+  TMOSDO_SELF_SERVICE_PUB_ASSET_ID_OVERRIDE: DU0250235
+  TMOSDO_SELF_SERVICE_SHOP_ASSET_ID_OVERRIDE: DU0250236
+  DWBDOM_SELF_SERVICE_MYTMO_ASSET_ID_OVERRIDE: DU0249973
+  TMOSDO_SELF_SERVICE_COMMERCE_ASSET_ID_OVERRIDE: DU0256752
+  DWBDOM_SELF_SERVICE_STORELOCATOR_ASSET_ID_OVERRIDE: DU0244113
+  ###
+  DAST_DISABLE: "true"
+  MEG_EDGE_PROXY_VALUES: config/$APP_NAME-values.yaml
+  CERT_ID: "NOT_SET"
+  RESTRICT_PRD_BRANCH: "false"
+  RESTRICT_PRD01_BRANCH: "false"
+  SLACK_WEBHOOK: "https://t-mo.slack.com/services/hooks/jenkins-ci/SToaaMPFiXAJyXKW3d9C0ZNG"
+  MEG_EDGE_PROXY_SCOPE: "aedge-int"
+  MEG_EDGE_PROXY_EXT_SCOPE: "aedge-ext"
+
+trigger-validate:
+  stage: tmo
+  script:
+    - tmoLog "verifying parameters"
+    - |- 
+        if [[ "$APP_NAME" == "auth" || "$APP_NAME" == "commerce" || "$APP_NAME" == "dam" || "$APP_NAME" == "dno" || "$APP_NAME" == "flex" || "$APP_NAME" == "metro" || "$APP_NAME" == "shop" || "$APP_NAME" == "mytmo" || "$APP_NAME" == "smp" || "$APP_NAME" == "pub" || "$APP_NAME" == "storelocator" ]]; then
+              tmoLog "The app name is set to "$APP_NAME""
+         else 
+              tmoLog "$APP_NAME is incorrect"
+              exit 1
+         fi
+    - |- 
+        if [[ "$DEPLOY_ENVIRONMENT" == "dev01" || "$DEPLOY_ENVIRONMENT" == "test" || "$DEPLOY_ENVIRONMENT" == "qlab01" || "$DEPLOY_ENVIRONMENT" == "qlab02" || "$DEPLOY_ENVIRONMENT" == "qlab03" || "$DEPLOY_ENVIRONMENT" == "qlab06" || "$DEPLOY_ENVIRONMENT" == "qlab07" || "$DEPLOY_ENVIRONMENT" == "plab01" || "$DEPLOY_ENVIRONMENT" == "stg" || "$DEPLOY_ENVIRONMENT" == "stg01" || "$DEPLOY_ENVIRONMENT" == "stg02" || "$DEPLOY_ENVIRONMENT" == "stg03" || "$DEPLOY_ENVIRONMENT" == "stg04" || "$DEPLOY_ENVIRONMENT" == "stg05" || "$DEPLOY_ENVIRONMENT" == "plab" ]]; then
+            tmoLog "The deploy environment is set to $DEPLOY_ENVIRONMENT"
+        elif  [[ "$DEPLOY_ENVIRONMENT" == "prd" && "$CHANGE_REQUEST_ID" == "CR*" || "$DEPLOY_ENVIRONMENT" == "prd01" && "$CHANGE_REQUEST_ID" == "CR*" || "$DEPLOY_ENVIRONMENT" == "prd" && "$CHANGE_REQUEST_ID" == "CHG*" || "$DEPLOY_ENVIRONMENT" == "prd01" && "$CHANGE_REQUEST_ID" == "CHG*" ]]; then
+            tmoLog "The deploy environment is set to $DEPLOY_ENVIRONMENT and change request id is  $CHANGE_REQUEST_ID"
+        else 
+            tmoLog "inputs are incorrect, Missing change request id"
+            exit 1
+        fi
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - when: never
+
+config:
+  tags:
+    - medium
+  image: registry.gitlab.com/tmobile/digital/docker_containers/ppl-register-tools/tmo-master:latest
+  stage: config
+  script:
+    - set -e
+    - mv config.json /tools/config.json
+    - cd /tools
+    - node register.js
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+      when: always
+    - when: never
+
+update-history:
+  tags:
+    - medium
+  image: registry.gitlab.com/tmobile/digital/docker_containers/ppl-register-tools/tmo-master:latest
+  stage: history
+  script:
+    - set -e
+    - cd /tools
+    - node updateHistory.js
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - when: never
+
+adhoc-compliance:
+  extends: .compliance
+  tags:
+    - medium
+  script:
+    - tmoLog "STORELOCATOR_PREFIX value is $STORELOCATOR_PREFIX"
+    - apk add --update --no-cache bash
+    - export TARGET_ADDR=$(bash target.sh)
+    - export TARGET_ADDR_E1=${TARGET_ADDR//dd-prd/dd-prd-e1}
+    - !reference [.compliance, script]
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator") && ($DEPLOY_ENVIRONMENT == "dev01" || $DEPLOY_ENVIRONMENT == "test" || $DEPLOY_ENVIRONMENT == "qlab01" || $DEPLOY_ENVIRONMENT == "qlab02" || $DEPLOY_ENVIRONMENT == "qlab03" || $DEPLOY_ENVIRONMENT == "qlab06" || $DEPLOY_ENVIRONMENT == "qlab07" || $DEPLOY_ENVIRONMENT == "plab01")
+      variables:
+        STORELOCATOR_PREFIX: 'dev'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "stg"
+      variables:
+        STORELOCATOR_PREFIX: 'staging'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "prd"
+      variables:
+        STORELOCATOR_PREFIX: 'prod'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "prd01"
+      variables:
+        STORELOCATOR_PREFIX: 'prod'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - when: never
+  environment: $DEPLOY_ENVIRONMENT
+
+adhoc-deploy:
+  stage: deploy
+  tags:
+    - medium
+  extends: .install_meg
+  script:
+      - tmoLog "STORELOCATOR_PREFIX value is $STORELOCATOR_PREFIX"
+      - apk add --update --no-cache bash
+      - export TARGET_ADDR=$(bash target.sh)
+      - export TARGET_ADDR_E1=${TARGET_ADDR//dd-prd/dd-prd-e1}
+      - !reference [.install_meg, script]
+  rules:
+    - if: ($CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator") && ($DEPLOY_ENVIRONMENT == "dev01" || $DEPLOY_ENVIRONMENT == "test" || $DEPLOY_ENVIRONMENT == "qlab01" || $DEPLOY_ENVIRONMENT == "qlab02" || $DEPLOY_ENVIRONMENT == "qlab03" || $DEPLOY_ENVIRONMENT == "qlab06" || $DEPLOY_ENVIRONMENT == "qlab07" || $DEPLOY_ENVIRONMENT == "plab01")
+      variables:
+        STORELOCATOR_PREFIX: 'dev'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "stg"
+      variables:
+        STORELOCATOR_PREFIX: 'staging'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "prd"
+      variables:
+        STORELOCATOR_PREFIX: 'prod'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger" && $APP_NAME == "storelocator" && $DEPLOY_ENVIRONMENT == "prd01"
+      variables:
+        STORELOCATOR_PREFIX: 'prod'
+      when: on_success
+    - if: $CI_PIPELINE_SOURCE == "trigger"
+      when: on_success
+    - when: never
+  environment: $DEPLOY_ENVIRONMENT
+  needs: ["adhoc-compliance"]

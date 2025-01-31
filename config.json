@@ -1,0 +1,54 @@
+{
+    "description": "Welcome to the API Gateway Adhoc Pipeline, please select the app and env to deploy edge gateway proxy.",
+    "defaultBranch": "tmo/main",
+    "jobs": [
+      {
+        "name": "Magenta Edge Gateway",
+        "description": "Please select the app and environment to deploy edge gateway proxy and change request id only required for prd and prd01 deployment",
+        "parameters": [
+          {
+            "name": "APP_NAME",
+            "values": [
+              "auth",
+              "commerce",
+              "dam",
+              "dno",
+              "pub",
+              "flex",
+              "shop",
+              "mytmo",
+              "metro",
+              "storelocator",
+              "smp"
+            ]
+          },
+          {
+            "name": "DEPLOY_ENVIRONMENT",
+            "values": [
+              "dev01",
+              "test",
+              "qlab01",
+              "qlab02",
+              "qlab03",
+              "qlab06",
+              "qlab07",
+              "plab01",
+              "stg",
+              "stg01",
+              "stg02",
+              "stg03",
+              "stg04",
+              "stg05",
+              "prd",
+              "prd01",
+              "plab"
+            ]
+          },
+          {
+          "name": "CHANGE_REQUEST_ID",
+          "default": "NOT_SET"
+          }
+        ]
+      }
+    ]
+  }

@@ -1,0 +1,104 @@
+apiVersion: gateway.t-mobile.com/v1alpha1
+kind: EdgeProxyService
+metadata:
+  name: lf-{{APP_NAME}}
+  annotations:
+    ## todo update these values
+    meg.t-mobile.com/duid: DUxxxxxxx
+    meg.t-mobile.com/teamEmail: your_team@t-mobile.com
+    meg.t-mobile.com/teamSlack: your_team_slack_channel
+    meg.t-mobile.com/apiSpecifications: "https://gitlab.com/yourrepo/swagger.yaml"
+    meg.t-mobile.com/envName: {{DEPLOY_ENVIRONMENT}}
+    meg.t-mobile.com/regionSpecificDns: 'true'
+spec:
+  trafficType: API
+  proxyScope: {{MEG_EDGE_PROXY_SCOPE}}
+  edgeProxy:
+    enableRequestPayloadLogging: false
+    enableResponsePayloadLogging: false
+    corsPolicy:
+      allowOriginRegex:
+        - 'https://[a-zA-Z0-9\-\.]*\.t-mobile.com'
+      allowHeaders: ["Content-Type", "Authorization", "x-auth-originator"]
+      allowMethods: ["POST"]
+      allowCredentials: true
+    connectionConfig:
+      timeout: 60s
+      retry:
+        retries: 3
+        perTryTimeout: 20s
+        retryOn: connect-failure
+    authentication:
+      requiredHeaders:
+        - name: "Authorization"
+          errorResponse:
+            statusCode: 401
+            body: "Missing Authorization header"
+        - name: "x-auth-originator"
+          errorResponse:
+            statusCode: 401
+            body: "Missing x-auth-originator header"
+    routeAction:
+      targets:
+        - name: catalog-get-offers-target
+          weight: 100
+      requestTransforms:
+        headerActions:
+          forwardHeaders:
+            - "Authorization"
+            - "x-auth-originator"
+    routes:
+      - matchers:
+          path:
+            value: "/api/v3/catalog/get_offers-POST"
+            matchType: "exact"
+          httpMethods: ["POST"]
+          routeDescriptor: "/api/v3/catalog/get_offers-POST"
+          rewrite:
+            pathTemplate: "/api/v3/catalog/get_offers"
+  edgeTargets:
+    connectionConfig:
+      connectTimeout: 30s
+      tcpKeepalive:
+        keepaliveTime: 30s
+        keepaliveProbes: 3
+    healthCheck:
+      interval: 20s
+      timeout: 10s
+      healthyThreshold: 2
+      unhealthyThreshold: 3
+      httpHealthCheck:
+        path: /version
+    targets:
+      - name: catalog-get-offers-target
+        regions:
+          - name: west
+            default: true
+            hosts:
+              - addr: {{TARGET_ADDR}}
+                port: 443
+                type: primary
+                healthCheck:
+                  httpHealthCheck:
+                    path: /version
+              - addr: {{TARGET_ADDR_E1}}
+                port: 443
+                type: failover
+                healthCheck:
+                  httpHealthCheck:
+                    path: /version
+          - name: east
+            default: false
+            hosts:
+              - addr: {{TARGET_ADDR_E1}}
+                port: 443
+                type: primary
+                healthCheck:
+                  httpHealthCheck:
+                    path: /version
+              - addr: {{TARGET_ADDR}}
+                port: 443
+                type: failover
+                healthCheck:
+                  httpHealthCheck:
+                    path: /version
