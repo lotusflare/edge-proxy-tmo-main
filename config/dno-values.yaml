@@ -50,12 +50,12 @@ spec:
     routes:
       - matchers:
           path:
-            value: "/api/v3/catalog/get_offers-POST"
+            value: "/api/v3/catalog/get_offers"
             matchType: "exact"
           httpMethods: ["POST"]
-          routeDescriptor: "/api/v3/catalog/get_offers-POST"
+          routeDescriptor: "/api/v3/catalog/get_offers"
           rewrite:
-            pathTemplate: "/api/v3/catalog/get_offers"
+            pathTemplate: "/api/v3/catalog/external/get_offers"
   edgeTargets:
     connectionConfig:
       connectTimeout: 30s
