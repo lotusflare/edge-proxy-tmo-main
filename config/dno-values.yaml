@@ -55,7 +55,7 @@ spec:
           httpMethods: ["POST"]
           routeDescriptor: "/api/v3/catalog/get_offers"
           rewrite:
-            pathTemplate: "/api/v3/catalog/external/get_offers"
+            pathTemplate: "/api/v3/provider/osa/external/get_offers"
   edgeTargets:
     connectionConfig:
       connectTimeout: 30s
