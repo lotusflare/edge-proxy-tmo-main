@@ -50,10 +50,10 @@ spec:
     routes:
       - matchers:
           path:
-            value: "/api/v3/provider/external/get_offers"
+            value: "/api/v3/catalog/get_offers"
             matchType: "exact"
           httpMethods: ["POST"]
-          routeDescriptor: "/api/v3/provider/external/get_offers"
+          routeDescriptor: "/api/v3/catalog/get_offers"
           rewrite:
             pathTemplate: "/api/v3/provider/external/get_offers"
   edgeTargets:
