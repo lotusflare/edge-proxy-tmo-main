@@ -1,9 +1,9 @@
 openapi: 3.0.0
 
 info:
-  title: "Provider TAAPSEC Proxy API"
+  title: "Product Catalog Proxy API"
   description: "A set of APIs that mediate external API calls from T-Mobile by implementing the TAAPSEC/Authz2
-                validation before calling the APIs internally"
+                validation before calling the Product Catalog APIs internally"
   version: "2.0"
   contact:
     name: LotusFlare
