@@ -1,0 +1,1531 @@
+openapi: 3.0.0
+
+info:
+  title: "Provider TAAPSEC Proxy API"
+  description: "A set of APIs that mediate external API calls from T-Mobile by implementing the TAAPSEC/Authz2
+                validation before calling the APIs internally"
+  version: "2.0"
+  contact:
+    name: LotusFlare
+    email: tech@lotusflare.com
+    url: http://www.lotusflare.com
+
+servers:
+  - url: https://dew-dev.lotusflare.com/{basePath}
+    description: LotusFlare API server
+    variables:
+      basePath:
+        default:
+          api/v3/provider/external
+
+components:
+  parameters:
+    authorization_header:
+      name: Authorization
+      in: header
+      description: Authorization token
+      required: true
+      schema:
+        type: string
+    optional_authorization_header:
+      name: Authorization
+      in: header
+      description: Authorization token
+      required: false
+      schema:
+        type: string
+
+  responses:
+    200:
+      description: "Request successful"
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/v3_response"
+              - type: object
+                properties:
+                  offer_by_id:
+                    additionalProperties:
+                      $ref: "#/components/schemas/entity_offer"
+                  product_by_id:
+                    additionalProperties:
+                      $ref: "#/components/schemas/entity_product"
+                  error_code:
+                    example: 0
+                  module:
+                    example: "CATALOG"
+    400:
+      description: >
+        Invalid request. This may be due to invalid JSON, or invalid/missing
+        fields in the request body.
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/v3_response"
+    403:
+      description: Authorization failure
+      content:
+        application/json:
+          schema:
+            allOf:
+              - $ref: "#/components/schemas/v3_response"
+              - type: object
+                properties:
+                  module:
+                    example: "AUTH"
+    500:
+      description: Server error
+      content:
+        application/json:
+          schema:
+            $ref: "#/components/schemas/v3_response"
+
+  schemas:
+    target_id:
+      type: string
+      description: ID of the target (e.g account) that is being fetched, should be passed with target_type
+      example: "sdfggt235678iygbsw146357f246gg"
+
+    target_type:
+      type: integer
+      description: |
+        Target type defines the type of the ID against which we want to perform certain action, should be passed with target_id
+      example: 1
+    uuid:
+      type: string
+      pattern: "[a-z0-9]{32}"
+      example: "8233df2c6a4949388263da84d96e36b9"
+
+    relationship:
+      type: object
+      properties:
+        type:
+          type: string
+          description: entity type, now only support type in the enum array
+          enum: [ "product", "category", "service" ]
+        id:
+          type: string
+          description: The entity id corresponding to the corresponding type
+      description: relationship
+      example: |
+        {
+          "type": "product",
+          "id": "9a163b1f06f5483fad00adacdf4bdb64"
+        }
+
+    epoch_timestamp:
+      type: integer
+      description: >
+        UNIX timestamp in UTC epoch seconds.
+      example: 1545667505
+
+    entity_id:
+      type: string
+      description: Unique ID of an entity
+      allOf:
+        - $ref: "#/components/schemas/uuid"
+
+    entity_version:
+      type: integer
+      description: Change version of an entity
+      example: 3
+
+    entity_state:
+      description: >
+        The state of the entity (1=UNAPPROVED|2=APPROVED|3=PAUSED|4=DELETED)
+      type: integer
+      minimum: 1
+      maximum: 4
+      example: 2
+
+    purchases_per_duration:
+      type: object
+      properties:
+        max:
+          type: integer
+          minimum: 1
+        duration:
+          description: |
+            Used to determine the window length.
+
+            The window length is determined by multiplying the `duration` by the
+            `number_of_durations`.
+
+            For example, if `duration` is 3 and `number_of_durations` is 2, then
+            then the total window is 2 months.
+
+            - `1`  Per Day
+            - `2`  Per Week
+            - `3`  Per Month
+            - `4`  Per Minute
+            - `5`  Per Year
+          type: integer
+          enum: [ 1, 2, 3, 4, 5 ]
+        number_of_durations:
+          type: integer
+          minimum: 1
+          example: 1000
+          description: >
+            Number of duration units for duration limit.
+
+    purchases_per_duration_per_preset:
+      type: object
+      required:
+        - max_purchase
+        - duration_unit
+        - number_of_duration_units
+      description: >
+        Total number of times this offer can be purchased for overall within a specific period of time.
+        Such as an offer can be purchased 1000 times per 3 months. If not present, indicates that there is no limit to how often this offer may be purchased.
+      properties:
+        max_purchase:
+          type: integer
+          minimum: 1
+          example: 1000
+          description: >
+            Total number of times this offer can be purchased.
+        duration_unit:
+          type: integer
+          example: 2
+          description: |
+            Used to determine the window length.
+
+            The window length is determined by multiplying the `duration` by the
+            `number_of_durations`.
+
+            For example, if `duration` is 3 and `number_of_durations` is 2, then
+            then the total window is 2 months.
+
+            - `1`  Per Day
+            - `2`  Per Week
+            - `3`  Per Month
+            - `4`  Per Minute
+            - `5`  Per Year
+          enum: [1 ,2, 3, 4, 5]
+        number_of_duration_units:
+          type: integer
+          minimum: 1
+          example: 1000
+          description: >
+            Number of duration units for duration limit.
+
+    segment_expression_list:
+      type: object
+      properties:
+        segment_ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/uuid"
+        logical_operator:
+          type: string
+          enum:
+            - AND
+            - OR
+
+    segment_expression:
+      description: >
+        A logical expression of segments used to determine if something is
+        applicable to a subscriber.
+      type: object
+      properties:
+        version:
+          description: Segment expression schema version
+          type: string
+          example: "1"
+        blacklist:
+          allOf:
+            - $ref: "#/components/schemas/segment_expression_list"
+            - description: >
+                List of segments a subscriber must be excluded from to be
+                contained in the segment expression.
+        whitelist:
+          allOf:
+            - $ref: "#/components/schemas/segment_expression_list"
+            - description: >
+                List of segments a subscriber must be included in to be
+                contained in the segment expression.
+
+    trial:
+      description: "Trials defined by duration before billing and floor of how to start count"
+      type: object
+      properties:
+        amount:
+          type: string
+          example: "0"
+          description: "amount or cost of trial"
+        duration:
+          type: integer
+          minimum: 1
+          description: length of trial period in seconds
+          example: 600000
+        duration_floor:
+          type: string
+          enum: ["none", "day", "hour"]
+          description: start immediately, floor start of day or floor start of hour
+        description:
+          type: string
+
+    v3_response:
+      type: object
+      properties:
+        error_code:
+          type: integer
+          description: Error code relative to the module
+          example: 1
+        module:
+          type: string
+          description: >
+            Module in which error occured, used for separation of different
+            error codes.
+          example: "COMMON"
+        epoch_timestamp:
+          $ref: "#/components/schemas/epoch_timestamp"
+
+    entity_base:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/entity_id"
+        version:
+          $ref: "#/components/schemas/entity_version"
+        state:
+          $ref: "#/components/schemas/entity_state"
+        data:
+          type: object
+
+    entity_offer:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/entity_base"
+      properties:
+        inventory_count:
+          type: integer
+          description: "Inventory count, usually max purchases - successful orders"
+          example: 499
+        data:
+          type: object
+          properties:
+            relationships:
+              description: |
+                List of relationships, if passed in when creating the offer, it will be returned as it is
+              type: array
+              items:
+                description: Relationship item
+                allOf:
+                  - $ref: "#/components/schemas/relationship"
+            amount:
+              description: (Deprecated. Please use amounts)
+                Price, in local currency.
+              type: string
+              example: "300.50"
+            name:
+              description: Name of the offer
+              type: string
+            description:
+              description: Description of the offer
+              type: string
+            sort_priority:
+              description: >
+                Priority. Determines order of offers in the UI, relative to
+                other offers in the category.
+              type: integer
+              minimum: 1
+              example: 10
+            start_time:
+              description: >
+                The time (in epoch seconds) at which purchases of this offer
+                will start to be allowed. If not specified, the value is assumed
+                to be 0.
+              allOf:
+                - $ref: "#/components/schemas/epoch_timestamp"
+            end_time:
+              description: >
+                The time (in epoch seconds) at which purchases of this offer
+                will no longer be allowed. If not specified, there is no end
+                time to this offer.
+              allOf:
+                - $ref: "#/components/schemas/epoch_timestamp"
+            max_purchases:
+              description: >
+                Total number of times this offer can be purchased (over all
+                subscribers). If not present, indicates that there is no limit
+                to how often this offer may be purchased.
+              type: integer
+              minimum: 1
+              example: 1000
+            max_purchases_per_user:
+              description: |
+                Maximum number of purchases each subscriber can make for this
+                offer. If not present, indicates that there is no limit to how
+                often this offer may be purchased.
+              type: integer
+              minimum: 1
+              example: 1
+            max_purchases_per_duration:
+              type: object
+              properties:
+                overall:
+                  $ref: "#/components/schemas/purchases_per_duration"
+                per_subscriber:
+                  $ref: "#/components/schemas/purchases_per_duration"
+            max_purchase_per_target:
+              description: >
+                Maximum number of purchases can make for this
+                offer on a specific target level. If not present, indicates that there is no limit how often this offer may be purchased.
+              type: object
+              properties:
+                target_type:
+                  type: integer
+                  example: 2
+                  description: Type of ID
+                data:
+                  type: object
+                  properties:
+                    max_purchase:
+                      type: integer
+                      minimum: 1
+                      example: 1000
+                      description: >
+                        Total number of times this offer can be purchased for a specific target level on a specific period of time.
+                        Such as an account can purchase 1000 of this offer. If not present, indicates that there is no limit to how often this offer may be purchased.
+                    max_purchases_per_duration:
+                      $ref: "#/components/schemas/purchases_per_duration_per_preset"
+            max_purchases_overall_per_duration:
+              $ref: "#/components/schemas/purchases_per_duration_per_preset"
+            max_subscription_per_target:
+              description: >
+                Maximum number of subscription can make for this
+                offer on a specific target level. If not present, indicates that there is no limit how often this offer may be subscribed.
+              type: object
+              properties:
+                target_type:
+                  type: integer
+                  example: 2
+                  description: Type of ID
+                data:
+                  type: object
+                  properties:
+                    max_subscription:
+                      type: integer
+                      minimum: 1
+                      example: 1000
+                      description: >
+                        The total allowable subscriptions for this offer at a specific target level. Put differently, this limits the number of times a user can actively use the offer.
+            segments:
+              $ref: "#/components/schemas/segment_expression"
+            static_assets:
+              type: object
+              description: "Static assets: key-value pairs of a name key and a url value such as \"big_icon\":\"https//static.lotusflare.com/1123455.jpg\""
+            integration_params:
+              type: object
+              description: >
+                Integration Parameters for operator specific APIs: key-value
+                pairs of two non-empty strings ^[a-zA-Z-0-9_]+$
+            amounts:
+              description: >
+                Key Value Pairs of currency name, currency amount: key-value
+                pairs of non-empty strings ^[a-zA-Z-0-9_]+$ to digits with
+                optional decimal places. Currently supported: primary
+              type: object
+            amount_breakdown:
+              properties:
+                final:
+                  type: number
+                  example: 7.50
+                initial:
+                  type: number
+                  example: 10.00
+                discount:
+                  type: number
+                  example: 2.50
+            ui_order:
+              description: >
+                The order the UI shows products, with the convention being if
+                it's not here, then it's invisible.
+              type: array
+              items:
+                description: item identifier, usually a UUID
+                type: string
+                example: "4657e5acb30945f2bf345f3a29ea867d"
+            external_id:
+              description: "ID from External source, for correlation"
+              type: string
+              example: "d2ddb60c-218b-4b8e-b613-05769031d3be"
+            expose_inventory_count:
+              type: boolean
+              description: "If true, display in inventory_count below"
+            trial:
+              $ref: "#/components/schemas/trial"
+            short_code:
+              type: string
+              description: >
+                The SMS short code associated with the offer.
+              example: "3421"
+            tax_inclusive:
+              type: boolean
+              description: >
+                Indicates whether the price includes tax or not.
+            proration:
+              description: >
+                This is used to determine which types of proration we use and if we want to include the joining date for proration.
+              type: object
+              properties:
+                prorate_on_price:
+                  type: boolean
+                  default: true
+                prorate_on_quota:
+                  type: boolean
+                  default: true
+                include_group_joining_date:
+                  type: boolean
+                  default: true
+              example: >
+                {
+                  "prorate_on_price": true,
+                  "prorate_on_quota": true,
+                  "include_group_joining_date": false
+                }
+
+    entity_product:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/entity_base"
+
+    entity_charging_spec:
+      type: object
+      allOf:
+        - $ref: "#/components/schemas/entity_base"
+
+    facet_entity_data_client_facing:
+      description: |
+        Facet entity data structure.
+      type: object
+      required:
+        - name
+        - reference_external_id
+        - schema
+      properties:
+        name:
+          type: string
+        sort_priority:
+          description: |
+            Specifies how clients should order facets in the UI relative to
+            other facets within the same category.
+          type: integer
+          minimum: 1
+          example: 10
+        reference_external_id:
+          description: |
+            property external id (property name)
+          type: string
+        schema:
+          description: |
+            facet jsonschema definition.
+            We always model facet as enumerated value, so it will be list of string.
+          type: object
+          properties:
+            enum:
+              type: array
+              items:
+                type: string
+    filter_mode:
+      description: |
+        Specify the filtering mode.
+        - FILTER: Default value. Actively removes the offer from the response if it fails this filter.
+        - FEEDBACK: Returns the offer in the response in the event the filter failed. Offer data is enriched with the failure details.
+      type: string
+      enum:
+        - FILTER
+        - FEEDBACK
+      default: FILTER
+
+    purchase_limit_filter_failure_details:
+      description: |
+        Under FEEDBACK filter mode, offers which filtered out by purchase limit filter would return with failure details.
+      type: array
+      items:
+        type: object
+        properties:
+          invalid_type:
+            type: integer
+            description: Purchase limitation check failure type
+              - 1 = max allowed overall
+              - 2 = max allowed per target
+              - 3 = max allowed overall per duration
+              - 4 = max allowed per target per duration
+            enum: [1,2,3,4]
+          existing_quantity:
+            type: integer
+            description: Quantity of bought offers
+          max_limit:
+            type: integer
+            description: max limitation
+      example:
+        [
+          {
+            "invalid_type":1,
+            "existing_quantity": 2,
+            "max_limit": 3,
+          },
+          {
+            "invalid_type":2,
+            "existing_quantity": 2,
+            "max_limit": 2,
+          }
+        ]
+
+
+    offer_with_quantity:
+      description: A list of offer IDs and their corresponding quantities that are to be validated for ordering.
+      type: array
+      minItems: 0
+      items:
+        type: object
+        properties:
+          id:
+            $ref: "#/components/schemas/entity_id"
+          quantity:
+            type: number
+            description: Quantity of the offer.
+            example: 3
+            default: 1
+            minimum: 1
+        required:
+          - id
+
+    offer_with_quantity_and_target_type:
+      description: A list of offer IDs and their corresponding quantities that are to be validated for ordering.
+      type: array
+      items:
+        type: object
+        properties:
+          id:
+            $ref: "#/components/schemas/entity_id"
+          quantity:
+            type: number
+            description: Quantity of the offer.
+            example: 3
+            default: 1
+            minimum: 1
+          target_type:
+            type: integer
+            example: 2
+            description: Type of ID
+        required:
+          - id
+
+    comp_rule_error:
+      type: object
+      properties:
+        ids:
+          type: array
+          items:
+            $ref: "#/components/schemas/entity_id"
+            description: Offer IDs causing the failure
+        type:
+          type: number
+          description: Compatiblity Rule Failure type
+            - 1 = PREREQUISITE
+            - 2 = CONFLICT
+          example: 1
+
+    purchase_limit_error_without_target_type:
+      type: object
+      properties:
+        max_limit:
+          type: number
+          description: Maximum overall purchase limit for that offer
+        type:
+          type: number
+          description: PURCHASE_LIMIT (3) Failure type
+          example: 3
+        invalid_type:
+          type: integer
+          example: 2
+          description: |
+            The configuration type
+            - `1`  overall maximum limit
+            - `2`  overall maximum per duration limit
+          enum: [ 1, 2]
+
+
+    purchase_limit_error_with_target_type:
+      type: object
+      properties:
+        max_limit:
+          type: number
+          description: Maximum purchase limit per target type for that offer
+        type:
+          type: number
+          description: PURCHASE_LIMIT (3) Failure type
+          example: 3
+        target_type:
+          type: integer
+          example: 2
+          description: Type of ID
+        invalid_type:
+          type: integer
+          example: 2
+          description: |
+            The configuration type
+            - `3`  per target maximum limit
+            - `4`  per target maximum limit per duration
+          enum: [ 3, 4 ]
+
+
+    subscription_limit_error_with_target_type:
+      type: object
+      properties:
+        max_limit:
+          type: number
+          description: Maximum subscription limit per target type for that offer
+        type:
+          type: number
+          description: SUBSCRIPTION_LIMIT (6) Failure type
+          example: 6
+        target_type:
+          type: integer
+          example: 2
+          description: Type of ID
+
+    filter_limit_error:
+      type: object
+      properties:
+        failed_filter:
+          type: string
+          description: Failed filter name for that offer
+        type:
+          type: number
+          description: FILTER(4) Failure type
+          example: 4
+
+    not_purchasable_overlap_error:
+      type: object
+      properties:
+        non_purchasable:
+          type: boolean
+          description: Whether it is a non purchasable offer.
+          example: true
+        type:
+          type: number
+          description: NON_PURCHASABLE(5) Failure type
+          example: 5
+
+    bundle_usage_only_error:
+      type: object
+      properties:
+        bundle_usage_only:
+          type: boolean
+          description: Whether it is a child offer for bundle usage only, it can only be purchased in bundles.
+          example: true
+        type:
+          type: number
+          description: BUNDLE_USAGE_ONLY(7) Failure type
+          example: 7
+
+    issue_items:
+      type: array
+      items:
+        oneOf:
+          - $ref: "#/components/schemas/comp_rule_error"
+          - $ref: "#/components/schemas/purchase_limit_error_without_target_type"
+          - $ref: "#/components/schemas/purchase_limit_error_with_target_type"
+          - $ref: "#/components/schemas/subscription_limit_error_with_target_type"
+          - $ref: "#/components/schemas/filter_limit_error"
+          - $ref: "#/components/schemas/not_purchasable_overlap_error"
+          - $ref: "#/components/schemas/bundle_usage_only_error"
+
+    invalid_offers:
+      type: object
+      properties:
+        id:
+          $ref: "#/components/schemas/entity_id"
+        issues:
+          $ref: "#/components/schemas/issue_items"
+
+    include_all_failures:
+      type: boolean
+      description: A flag to indicate whether the response should contain all the errors or return of first failure.
+      default: false
+      example: true
+paths:
+  /get_offers:
+    post:
+      summary: >
+        Retrieves a list of available offers. This endpoint would support both account and subscriber user levels.
+        Based on the user levels, the end point will return corresponding offers.
+      description: >
+        It will return all offers that are live now and also have a start date in the future. It will not return any offers that have ended.
+      parameters:
+        - $ref: "#/components/parameters/optional_authorization_header"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                ids:
+                  description: >
+                    A list of offer IDs to return. Supplying an offer ID will
+                    prevent any other filtering from being applied.
+                  type: array
+                  items:
+                    type: string
+                    example: f6bbaf9158364504893198ba9dc296cd
+                id_type:
+                  description: >
+                    The type of IDs being specified. Used to differentiate
+                    between entity ID, SMS short code, external ID, etc.
+                  type: string
+                  enum: ["short_code", "external_id", "id"]
+                language_code:
+                  description: >
+                    The language code used to determine which localized string
+                    to return.
+                  type: string
+                  example: en
+                show_categories:
+                  description: >
+                    If true, will show category tree that contains the
+                    parent-child relationships between categories, which
+                    offers belong to which categories, and uncategorized
+                    offers.
+                  type: boolean
+                include_compatibility_rules:
+                  description: >
+                    If true, will show the list of compatibility rules for that offer.
+                  type: boolean
+                  default: false
+                  example: true
+                include_validation_rules:
+                  description: >
+                    If true, will show the list of validation rule IDs for each offer and an
+                    accompanying list of validation rule data. Note that depending on the filter
+                    options passed there may be validation rule IDs present for an offer that are
+                    not included in the list of complete data.
+                  type: boolean
+                  default: false
+                  example: true
+                timestamp:
+                  description: >
+                    (deprecated)
+                    Used by the Product Catalog caching mechanism. Identifies
+                    the version of the offer list that's present on the caller
+                    side.
+                  type: integer
+                  example: 1570482479
+                include_constraints_metadata:
+                  type: boolean
+                  description: >
+                    If true, we will get constraints_metadata property for each offer.
+                    This property contains information about
+                    - conflicts: Offers that conflict with this offer i.e. these conflicting offers can't be bought with this offer. It can be at subscriber or account or all levels.
+                    - required_by: Offers that are required by this offer i.e. those offer can't be bought without this current offers. It can be at subscriber or account or all levels.
+                    - prerequisite: Offers that are prerequisites for this offer i.e. this current offer can't be bought without these offers. It can be at subscriber or account or all levels.
+                  default: false
+                  example: true
+                etag:
+                  type: string
+                  description: >
+                    Used by the Product Catalog caching mechanism.
+                    Identifies the version of the offer list that's present on the caller side.
+                    Includes segment filtering stamp, which is the md5 of the sorted concatenation
+                    of all ids of the offer list. Format is epoch-hexnodashes
+
+                  example: "157048247-84e22d52b921d9a9490a721aa8d21669"
+                filter_config:
+                  type: object
+                  properties:
+                    purchase_limit:
+                      $ref: "#/components/schemas/filter_mode"
+                    category:
+                      $ref: "#/components/schemas/filter_mode"
+                category_ids:
+                  description: >
+                    A list of category IDs to return.
+                    Filter out some entity by category ids.
+                  type: array
+                  items:
+                    type: string
+                    example: 57fb7faa09b247d39387c70cbe6fb2vw
+                addressbook_id:
+                  description: >
+                    The addressbook ID to return.
+                    Filter out some entity by addressbook id.
+                  type: string
+                  example: 00d48325b289487a57abfe01ec0cfbda4c5753553164e5bb721c79814db992a8
+                provider_id:
+                  description: >
+                    The provider identifier.
+                    Filter out some entity by provider id.
+                  type: string
+                  example: pilot
+                market_id:
+                  description: >
+                    The market identifier.
+                    Filter out some entity by market id.
+                  type: string
+                  example: Manhattan
+                page_num:
+                  description: >
+                    Optional argument to describe if the offers must be paginated and the page number to be returned.
+                  type: number
+                page_size:
+                  description: >
+                    Optional argument to be specified if page_num is specified, to request the max size of the page to be returned.
+                  type: number
+                target_id:
+                  $ref: "#/components/schemas/target_id"
+                target_type:
+                  $ref: "#/components/schemas/target_type"
+      responses:
+        200:
+          description: Retrieves offer(s) successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  code:
+                    type: integer
+                    example: 0
+                  module:
+                    type: string
+                    example: "CATALOG"
+                  timestamp:
+                    type: integer
+                    example: 1586285673
+                  offer_by_id:
+                    type: object
+                    additionalProperties:
+                      type: object
+                      properties:
+                        constraints_metadata:
+                          type: object
+                          properties:
+                            limits:
+                              type: object
+                            compatibilities:
+                              type: object
+                              properties:
+                                conflict:
+                                  type: array
+                                  description: >
+                                    This array of object contains objects with ids(Offer IDs), target_type.
+                                    1. ids: This array contains the list of offer ids that conflict with this offer
+                                    2. target_type: If present,
+                                      - 1 means offers in ids array conflict with this offer at Subscriber level
+                                      - 2 means offers in ids array conflict with this offer at Account level etc.
+                                      - If not present, it means it is applicable for all the target types.
+                                  items:
+                                    type: object
+                                    properties:
+                                      target_type:
+                                        type: integer
+                                        description: Target Type
+                                        example: 2
+                                      ids:
+                                        type: array
+                                        items:
+                                          type: string
+                                        description: This array contains the list of conflicting offer ids
+                                        example: ["f6bbaf9158364504893198ba9dc296cd", "f6bbaf9158364504893198ba9dc296cd"]
+                                required_by:
+                                  type: array
+                                  description: >
+                                    This array of object contains objects with ids(Offer IDs), target_type.
+                                    1. ids: This array contains the list of all the offer ids that require this offer
+                                    2. target_type: If present,
+                                      - 1 means offers in ids array require this offer at Subscriber level
+                                      - 2 means offers in ids array require this offer at Account level etc.
+                                      - If not present, it means it is applicable for all the target types.
+                                  items:
+                                    type: object
+                                    properties:
+                                      target_type:
+                                        type: integer
+                                        description: Target Type
+                                        example: 2
+                                      ids:
+                                        type: array
+                                        items:
+                                          type: string
+                                        description: This array contains the list of all the offer ids required by this offer
+                                        example: ["f6bbaf9158364504893198ba9dc296cd", "f6bbaf9158364504893198ba9dc296cd"]
+                                prerequisite:
+                                  type: array
+                                  description: >
+                                    This array of object contains objects with ids(Offer IDs), target_type and eval_operation.
+                                    1. ids: This array contains the list of all the offer ids required by this offer
+                                    2. target_type: If present,
+                                      - 1 means offers in ids array are required at Subscriber level
+                                      - 2 means offers in ids array are required at Account level etc.
+                                      - If not present, it means it is applicable for all the target types.
+                                    3. eval_operation: Evaluation Operation. 1 for AND, means this offer requires all the offer ids in ids array and 2 for OR, means this offer requires any of the offer ids in ids array
+                                  items:
+                                    type: object
+                                    properties:
+                                      target_type:
+                                        type: integer
+                                        description: Target Type
+                                        example: 2
+                                      ids:
+                                        type: array
+                                        items:
+                                          type: string
+                                        description: This array contains the list of all the offer ids required by this offer
+                                        example: ["f6bbaf9158364504893198ba9dc296cd", "f6bbaf9158364504893198ba9dc296cd"]
+                                      eval_operation:
+                                        type: integer
+                                        description: Evaluation Operation. 1 for AND and 2 for OR
+                                        example: 1
+                  service_by_id:
+                    type: object
+                  category_by_id:
+                    type: object
+              examples:
+                get_offers_of_DPP_applications:
+                  value:
+                    {
+                      "code": 0,
+                      "module": "CATALOG",
+                      "timestamp": 1586285673,
+                      "application_by_id": {
+                        "7dff93624e7a4153914698b804c5024c": {
+                          "update_time": 1586285660,
+                          "state": 2,
+                          "id": "7dff93624e7a4153914698b804c5024c",
+                          "data": {
+                            "package_name": "com.facebook.katana",
+                            "signature": "F9CF2124DFAACCC45E7E3F739ECA55AE",
+                            "approve_on_create": true,
+                            "id": "7dff93624e7a4153914698b804c5024c",
+                            "portal_id": "0",
+                            "name": "Facebook",
+                            "icon_key": "v3/icons/com.facebook.katana",
+                            "icon": "https://static-assets.lotusflare.com/dpp-assets/v3/icons/com.facebook.katana"
+                          },
+                          "version": 1
+                        },
+                        "cb12595d204d4cf6ac5dd00166e07ff3": {
+                          "update_time": 1586285656,
+                          "state": 2,
+                          "id": "cb12595d204d4cf6ac5dd00166e07ff3",
+                          "data": {
+                            "package_name": "com.instagram.android",
+                            "signature": "F9CF2124DFAACCC45E7E3F739ECA55AE",
+                            "approve_on_create": true,
+                            "id": "cb12595d204d4cf6ac5dd00166e07ff3",
+                            "portal_id": "0",
+                            "name": "Instagram",
+                            "icon_key": "v3/icons/com.instagram.android.png",
+                            "icon": "https://static-assets.lotusflare.com/dpp-assets/v3/icons/com.instagram.android.png"
+                          },
+                          "version": 1
+                        }
+                      },
+                      "offer_by_id": {
+                        "29b2c9abe8064a57906f3f0c650a6f65": {
+                          "update_time": 1585960327,
+                          "amount_breakdown": {
+                            "final": "0",
+                            "initial": "0",
+                            "discount": "0"
+                          },
+                          "compatibility_rules": [
+                            {
+                              "id": "f79066c7feda4cbab07c78ea879c05ba",
+                              "rule_type": 1,
+                              "rule_eval_operation" : 1
+                            }
+                          ],
+                          "constraints_metadata": {
+                            "compatibilities": {
+                              "conflict": [
+                                "f0d53f04f83044d8abc3e60dfcce9e52"
+                              ],
+                              "required_by": [
+                                "52833c1bbc144636a217424a264e58ad"
+                              ],
+                              "prerequisite": {
+                                "1": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ],
+                                "2": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ]
+                              }
+                            }
+                          },
+                          "validation_rule_ids": [
+                            "f0d53f04f83044d8abc3e60dfcce9e52",
+                            "52833c1bbc144636a217424a264e58ad"
+                          ],
+                          "id": "29b2c9abe8064a57906f3f0c650a6f65",
+                          "state": 2,
+                          "version": 1
+                        },
+                        "d5cce34c59884f48a7e9ca08d2da91eb": {
+                          "update_time": 1585960327,
+                          "amount_breakdown": {
+                            "final": "55000",
+                            "initial": "55000",
+                            "discount": "0"
+                          },
+                          "id": "d5cce34c59884f48a7e9ca08d2da91eb",
+                          "state": 2,
+                          "data": {
+                            "end_time": 4102473600,
+                            "max_purchases": 1000,
+                            "max_purchases_per_user": 1000,
+                            "max_purchase_per_target":
+                              {
+                                "2" :{
+                                  "max_purchase": 1000,
+                                }
+                              },
+                            "start_time": 946713600,
+                            "products": [
+                              "aae35bf739374e5ba0033408a22c0315"
+                            ],
+                            "relationships": [
+                              {
+                                "type": "product",
+                                "id": "aae35bf739374e5ba0033408a22c0315"
+                              }
+                            ],
+                            "description": "Test Offer With Amounts in Multiple Currencies",
+                            "name": "Test Offer With Amounts in Multiple Currencies",
+                            "sort_priority": 11,
+                            "amounts": {
+                              "primary": "55000",
+                            },
+                            "tax_inclusive": true,
+                          },
+                          "failed_filters": [
+                            {
+                              "name": "purchase_limit",
+                              "failed_detail": [
+                                {
+                                  "invalid_type": 1,
+                                  "existing_quantity": 2,
+                                  "max_limit": 3
+                                },
+                                {
+                                  "invalid_type": 2,
+                                  "existing_quantity": 2,
+                                  "max_limit": 3
+                                }
+                              ]
+                            }
+                          ],
+                          "constraints_metadata": {
+                            "compatibilities": {
+                              "conflict": [
+                                "f0d53f04f83044d8abc3e60dfcce9e52"
+                              ],
+                              "prerequisite": {
+                                "1": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ],
+                                "2": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ]
+                              }
+                            }
+                          },
+                          "version": 1
+                        },
+                        "0fa479b252484bb398cb4ee85c7179bc": {
+                          "update_time": 1586285673,
+                          "state": 2,
+                          "id": "0fa479b252484bb398cb4ee85c7179bc",
+                          "amount_breakdown": {
+                            "final": "30000",
+                            "initial": "30000",
+                            "discount": "0"
+                          },
+                          "data": {
+                            "amounts": {
+                              "primary": "30000"
+                            },
+                            "sort_priority": 100,
+                            "start_time": 0,
+                            "relationships": [
+                              {
+                                "type": "product",
+                                "id": "76a9e2c8b5b8444ab38b277aec81c045"
+                              }
+                            ],
+                            "name": "Integration Test 2020-04-07T18:54:31.674Z DPP",
+                            "description": "0.5 GB over 4G networks",
+                            "max_purchases_overall_per_duration":{
+                              "max_purchase": 1000,
+                              "duration_unit": 1,
+                              "number_of_duration_units": 1
+                            },
+                            "max_purchases_per_user": 1000,
+                            "max_purchase_per_target":{
+                              "2": {
+                                "max_purchase": 1000,
+                                "max_purchases_per_duration": {
+                                  "max_purchase": 10,
+                                  "duration_unit": 1,
+                                  "number_of_duration_units": 1
+                                }
+                              }
+                            },
+                            "max_purchases_per_duration": {
+                              "per_subscriber": {
+                                "max": 10,
+                                "duration": 1,
+                                "number_of_durations": 1
+                              },
+                              "overall": {
+                                "max": 1000,
+                                "duration": 1,
+                                "number_of_durations": 1
+                              }
+                            },
+                            "end_time": 2000000000,
+                            "max_purchases": 10000,
+                            "tax_inclusive": true,
+                          },
+                          "version": 1
+                        },
+                        "b1af725424074cafa9cba0eaf62914e9": {
+                          "update_time": 1585960327,
+                          "state": 2,
+                          "id": "b1af725424074cafa9cba0eaf62914e9",
+                          "validation_rule_ids": [
+                            "f0d53f04f83044d8abc3e60dfcce9e52"
+                          ],
+                          "amount_breakdown": {
+                            "final": "0",
+                            "initial": "0",
+                            "discount": "0"
+                          },
+                          "inventory_count": 99,
+                          "data": {
+                            "end_time": 4102473600,
+                            "sort_priority": 10,
+                            "expose_inventory_count": true,
+                            "start_time": 946713600,
+                            "relationships": [
+                              {
+                                "type": "product",
+                                "id": "aae35bf739374e5ba0033408a22c0315"
+                              }
+                            ],
+                            "name": "Test Offer with Exposed Inventory Count",
+                            "description": "Test Offer",
+                            "max_purchases_per_user": 100,
+                            "max_purchase_per_target":
+                              {
+                                "2" :{
+                                  "max_purchase": 100,
+                                }
+                              },
+                            "amounts": {
+                              "primary": "0"
+                            },
+                            "max_purchases": 100,
+                            "tax_inclusive": true,
+                          },
+                          "version": 1
+                        },
+                        "f6bbaf9158364504893198ba9dc296cd": {
+                          "update_time": 1585960327,
+                          "amount_breakdown": {
+                            "final": "0",
+                            "initial": "0",
+                            "discount": "0"
+                          },
+                          "id": "f6bbaf9158364504893198ba9dc296cd",
+                          "state": 2,
+                          "data": {
+                            "end_time": 4102473600,
+                            "max_purchases": 100,
+                            "max_purchases_per_user": 100,
+                            "max_purchase_per_target":
+                              {
+                                "2" :{
+                                  "max_purchase": 100,
+                                }
+                              },
+                            "start_time": 946713600,
+                            "relationships": [
+                              {
+                                "type": "product",
+                                "id": "aae35bf739374e5ba0033408a22c0315"
+                              }
+                            ],
+                            "description": "Test Offer",
+                            "name": "Test Offer",
+                            "sort_priority": 10,
+                            "amounts": {
+                              "primary": "0"
+                            },
+                            "tax_inclusive": true,
+                          },
+                          "constraints_metadata": {
+                            "compatibilities": {
+                              "conflict": [
+                                "f0d53f04f83044d8abc3e60dfcce9e52"
+                              ],
+                              "required_by": [
+                                "52833c1bbc144636a217424a264e58ad"
+                              ]
+                            }
+                          },
+                          "version": 1
+                        },
+                        "8b21148983a24b57846bff7094568788": {
+                          "update_time": 1585960327,
+                          "amount_breakdown": {
+                            "final": "0",
+                            "initial": "0",
+                            "discount": "0"
+                          },
+                          "id": "8b21148983a24b57846bff7094568788",
+                          "state": 2,
+                          "version": 1
+                        },
+                        "4290fccf93f64fb3b69ba56494f086fc": {
+                          "update_time": 1588951282,
+                          "state": 2,
+                          "id": "4290fccf93f64fb3b69ba56494f086fc",
+                          "amount_breakdown": {
+                            "final": "30001",
+                            "initial": "30001",
+                            "discount": "0"
+                          },
+                          "data": {
+                            "amounts": {
+                              "primary": "30001"
+                            },
+                            "relationships": [
+                              {
+                                "type": "product",
+                                "id": "9a163b1f06f5483fad00adacdf4bdb64"
+                              }
+                            ],
+                            "end_time": 154630080000,
+                            "short_code": "WEEKENDPROMO",
+                            "description": "0.5 GB over 4G networks",
+                            "name": "0.5 GB over 4G networks",
+                            "start_time": 0,
+                            "sort_priority": 100,
+                            "tax_inclusive": true,
+                          },
+                          "constraints_metadata": {
+                            "compatibilities": {
+                              "prerequisite": {
+                                "1": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ],
+                                "2": [
+                                  "f0d53f04f83044d8abc3e60dfcce9e52",
+                                  "52833c1bbc144636a217424a264e58ad"
+                                ]
+                              }
+                            }
+                          },
+                          "version": 1
+                        }
+                      },
+                      "service_by_id": {
+                        "73b6ce599ee74c5da6f3d96d08759fbd": {
+                          "update_time": 1585960327,
+                          "state": 2,
+                          "id": "73b6ce599ee74c5da6f3d96d08759fbd",
+                          "data": {
+                            "type": "charging_spec",
+                            "conditions": {
+                              "expr": {
+                                "and": [
+                                  "90828b0d-9d22-40ef-82e6-81e78756f02d"
+                                ]
+                              },
+                              "original_expr": [
+                                {
+                                  "value": [
+                                    {
+                                      "label": "Condition 1",
+                                      "conditionUUID": "90828b0d-9d22-40ef-82e6-81e78756f02d"
+                                    }
+                                  ],
+                                  "groupRelation": null,
+                                  "relation": null
+                                }
+                              ],
+                              "original_conditions": [
+                                {
+                                  "uuid": "90828b0d-9d22-40ef-82e6-81e78756f02d",
+                                  "name": "Bearer",
+                                  "data": [
+                                    "4G"
+                                  ],
+                                  "type": "bearer"
+                                }
+                              ],
+                              "parameters": {
+                                "90828b0d-9d22-40ef-82e6-81e78756f02d": {
+                                  "values": [
+                                    "4G"
+                                  ],
+                                  "type": "bearer"
+                                }
+                              }
+                            },
+                            "name": "Test Charging Specification",
+                            "description": "Test Charging Specification",
+                            "rate": "0",
+                            "service_type": 2,
+                            "rate_period": 1,
+                            "charge_type": 1
+                          },
+                          "version": 1
+                        },
+                        "a6064ddd1fe34563a4b9ccc9173638cf": {
+                          "update_time": 1586285664,
+                          "state": 2,
+                          "id": "a6064ddd1fe34563a4b9ccc9173638cf",
+                          "data": {
+                            "approve_on_create": true,
+                            "name": "Test Charging Spec Instagram",
+                            "conditions": {
+                              "expr": {
+                                "and": [
+                                  "0bea01c6e691484cae6fd887357f7bbd"
+                                ]
+                              },
+                              "parameters": {
+                                "0bea01c6e691484cae6fd887357f7bbd": {
+                                  "values": [
+                                    "2G",
+                                    "3G",
+                                    "4G"
+                                  ],
+                                  "type": "bearer"
+                                }
+                              }
+                            },
+                            "applications": [
+                              "cb12595d204d4cf6ac5dd00166e07ff3",
+                              "7dff93624e7a4153914698b804c5024c"
+                            ],
+                            "type": "charging_spec",
+                            "unit_amount": 100000000,
+                            "service_type": 4,
+                            "max_selectable": 1,
+                            "charge_type": 1
+                          },
+                          "version": 1
+                        }
+                      },
+                      "etag": "1586285673-5610e5c21aa1a716ca805da247512310",
+                      "product_by_id": {
+                        "aae35bf739374e5ba0033408a22c0315": {
+                          "update_time": 1585960327,
+                          "state": 2,
+                          "id": "aae35bf739374e5ba0033408a22c0315",
+                          "data": {
+                            "priority": 0,
+                            "is_recurring": true,
+                            "services": [
+                              "73b6ce599ee74c5da6f3d96d08759fbd"
+                            ],
+                            "name": "Test Base Plan",
+                            "type": "base_plan"
+                          },
+                          "version": 1
+                        },
+                        "76a9e2c8b5b8444ab38b277aec81c045": {
+                          "update_time": 1586285669,
+                          "state": 2,
+                          "id": "76a9e2c8b5b8444ab38b277aec81c045",
+                          "data": {
+                            "priority": 1,
+                            "is_recurring": true,
+                            "services": [
+                              "a6064ddd1fe34563a4b9ccc9173638cf"
+                            ],
+                            "name": "0.5 GB over 4G networks",
+                            "approve_on_create": true,
+                            "type": "add_on"
+                          },
+                          "version": 1
+                        }
+                      },
+                      "validation_rule_by_id": {
+                        "f0d53f04f83044d8abc3e60dfcce9e52": {
+                          "id": "f0d53f04f83044d8abc3e60dfcce9e52",
+                          "version": 1,
+                          "state": 2,
+                          "type": "validation_rule",
+                          "update_time": 1707425431,
+                          "data": {
+                            "start_time": 0,
+                            "target_type": 1,
+                            "entity_ids": [
+                              "29b2c9abe8064a57906f3f0c650a6f65"
+                            ],
+                            "entity_type": "offer",
+                            "description": {
+                              "en": "Compatibility rule name"
+                            },
+                            "conflicting_entity_ids": [
+                              "b1af725424074cafa9cba0eaf62914e9"
+                            ],
+                            "type": "conflict",
+                            "name": {
+                              "en": "Compatibility rule"
+                            }
+                          }
+                        },
+                        "52833c1bbc144636a217424a264e58ad": {
+                          "id": "52833c1bbc144636a217424a264e58ad",
+                          "version": 2,
+                          "state": 2,
+                          "type": "validation_rule",
+                          "update_time": 1707425427,
+                          "data": {
+                            "start_time": 0,
+                            "target_type": 1,
+                            "entity_ids": [
+                              "29b2c9abe8064a57906f3f0c650a6f65"
+                            ],
+                            "entity_type": "offer",
+                            "description": {
+                              "en": "Subscription limit rule"
+                            },
+                            "type": "subscription_limit",
+                            "max_subscription_limit": {
+                              "maximum": 1
+                            },
+                            "name": {
+                              "en": "Subscription Limit rule"
+                            }
+                          }
+                        }
+                      },
+                      "page_metadata": {
+                        "page_size": 7,
+                        "total_entities_size": 7,
+                        "page_num": 1
+                      }
+                    }
+        400:
+          $ref: '#/components/responses/400'
+        403:
+          $ref: '#/components/responses/403'
+        500:
+          $ref: '#/components/responses/500'
