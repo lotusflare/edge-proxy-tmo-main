@@ -16,7 +16,7 @@ servers:
     variables:
       basePath:
         default:
-          api/v3/provider/external
+          api/v3/catalog
 
 components:
   parameters:
