@@ -3,11 +3,10 @@ kind: EdgeProxyService
 metadata:
   name: lf-{{APP_NAME}}
   annotations:
-    ## todo update these values
-    meg.t-mobile.com/duid: DUxxxxxxx
-    meg.t-mobile.com/teamEmail: your_team@t-mobile.com
+    meg.t-mobile.com/duid: SDLCC0600082
+    meg.t-mobile.com/teamEmail: kunal.shah29@t-mobile.com
     meg.t-mobile.com/teamSlack: your_team_slack_channel
-    meg.t-mobile.com/apiSpecifications: "https://gitlab.com/yourrepo/swagger.yaml"
+    meg.t-mobile.com/apiSpecifications: "https://gitlab.com/tmobile/tmo-fiber/edge-proxy-tmo-main/-/blob/tmo/main/docs/swagger/ProductCatalog.yaml"
     meg.t-mobile.com/envName: {{DEPLOY_ENVIRONMENT}}
     meg.t-mobile.com/regionSpecificDns: 'true'
 spec:
