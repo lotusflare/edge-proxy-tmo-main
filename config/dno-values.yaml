@@ -6,7 +6,6 @@ metadata:
     meg.t-mobile.com/duid: SDLCC0600082
     meg.t-mobile.com/teamEmail: kunal.shah29@t-mobile.com
     meg.t-mobile.com/teamSlack: your_team_slack_channel
-    meg.t-mobile.com/apiSpecifications: "https://gitlab.com/tmobile/tmo-fiber/edge-proxy-tmo-main/-/blob/tmo/main/docs/swagger/ProductCatalog.yaml"
     meg.t-mobile.com/envName: {{DEPLOY_ENVIRONMENT}}
     meg.t-mobile.com/regionSpecificDns: 'true'
 spec:
@@ -20,6 +19,8 @@ spec:
         - 'https://[a-zA-Z0-9\-\.]*\.t-mobile.com'
       allowHeaders: ["Content-Type", "Authorization", "x-auth-originator"]
       allowMethods: ["POST"]
+      exposeHeaders: ["Okta_Access_Token", "Okta_Refresh_Token", "Date", "timezone", "userstoreid"]
+      maxAge: 1d
       allowCredentials: true
     connectionConfig:
       timeout: 60s
@@ -48,12 +49,14 @@ spec:
             matchType: "exact"
           httpMethods: ["POST"]
           routeDescriptor: "/api/v3/catalog/get_offers"
+          disableAuth: true
       - matchers:
           path:
             value: "/api/v3/osstmofiber/service/update"
             matchType: "exact"
           httpMethods: ["POST"]
           routeDescriptor: "/api/v3/osstmofiber/service/update"
+          disableAuth: true
   edgeTargets:
     connectionConfig:
       connectTimeout: 30s
