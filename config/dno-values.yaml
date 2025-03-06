@@ -39,13 +39,8 @@ spec:
             body: "Missing x-auth-originator header"
     routeAction:
       targets:
-        - name: catalog-get-offers-target
+        - name: lf-{{APP_NAME}}--{{DEPLOY_ENVIRONMENT}}-target
           weight: 100
-      requestTransforms:
-        headerActions:
-          forwardHeaders:
-            - "Authorization"
-            - "x-auth-originator"
     routes:
       - matchers:
           path:
@@ -53,8 +48,12 @@ spec:
             matchType: "exact"
           httpMethods: ["POST"]
           routeDescriptor: "/api/v3/catalog/get_offers"
-          rewrite:
-            pathTemplate: "/api/v3/provider/external/get_offers"
+      - matchers:
+          path:
+            value: "/api/v3/osstmofiber/service/update"
+            matchType: "exact"
+          httpMethods: ["POST"]
+          routeDescriptor: "/api/v3/osstmofiber/service/update"
   edgeTargets:
     connectionConfig:
       connectTimeout: 30s
@@ -69,7 +68,7 @@ spec:
       httpHealthCheck:
         path: /version
     targets:
-      - name: catalog-get-offers-target
+      - name: lf-{{APP_NAME}}--{{DEPLOY_ENVIRONMENT}}-target
         regions:
           - name: west
             default: true
